@@ -26,8 +26,6 @@ def get_sherlock_vector(net, blob, prototxt, model):
     result = np.empty([0, 3, 224, 224])
     for i in blob:
         result = np.append(result, [transformer.preprocess('data', i)], axis=0)
-    #print result.shape
-    #net.blobs['tuple_data'].reshape(result.shape[0], result.shape[1], result.shape[2], result.shape[3])
     net.blobs['data'].reshape(result.shape[0], result.shape[1],result.shape[2],result.shape[3])
     net.blobs['data'].data[...] = result  # transformer.preprocess('data', blob)
     net.reshape()
@@ -58,7 +56,6 @@ def im_list_to_blob(ims):
     # Axis order will become: (batch elem, channel, height, width)
     channel_swap = (0, 3, 1, 2)
     blob = blob.transpose(channel_swap)
-    print blob.shape, "Shape of blob"
     return blob
 
 
@@ -82,7 +79,7 @@ def get_image(path):
     im = caffe.io.load_image(path)
     return im
 
-gpu_id = 0
+gpu_id = 2
 parser = argparse.ArgumentParser()
 parser.add_argument('-prototxt', type=str, default='/home/rohit/Downloads/deploy.prototxt')
 parser.add_argument('-model', type=str, default='/home/rohit/Downloads/sherlock.caffemodel')
@@ -91,8 +88,8 @@ parser.add_argument('-mean_image', type=str, default='/home/rohit/Downloads/caff
 args = parser.parse_args()
 
 net = caffe.Net(args.prototxt, args.model, caffe.TEST)
-# caffe.set_mode_gpu()
-# caffe.set_device(gpu_id)
+caffe.set_mode_gpu()
+caffe.set_device(gpu_id)
 
 images = get_images(args.path)
 sherlock_features = []
@@ -103,7 +100,7 @@ counter = 0
 num = 0
 i = 0
 
-id_map_file = open('id_map.txt')
+id_map_file = open('id_map.txt','w',0)
 
 print len(images)
 
@@ -111,23 +108,25 @@ while i < len(images):
     num += 1
     filename = os.path.basename(images[i])
     image_id = filename.replace('COCO_train2014_','').replace('.jpg','').lstrip('0')
-    id_map_file.write(image_id + str(num))
+    id_map_file.write(image_id + " " + str(num) + "\n" )
     image_list.append(prep_im_for_blob(get_image(images[i]), get_mean_imagenet(args.mean_image), 224, 224))
     if (i + 1) % (batch_size) == 0:
         print num
         blob = im_list_to_blob(image_list)
-        print len(image_list)
         image_list = []
         sherlock_features.append(get_sherlock_vector(net, blob, args.prototxt, args.model))
         print "batch done", batch_number
         batch_number += 1
     i += 1
-
-print num
-sherlock_features_numpy = np.array(sherlock_features)
-print sherlock_features_numpy.shape
+print len(image_list)
+blob = im_list_to_blob(image_list)
+sherlock_features.append(get_sherlock_vector(net, blob, args.prototxt, args.model))
+print "Length of sherlock features:",len(sherlock_features)
+sherlock_features_numpy = np.array(sherlock_features[:-1])
 sherlock_features_numpy = sherlock_features_numpy.reshape(
     sherlock_features_numpy.shape[0] * sherlock_features_numpy.shape[1], 900)
+sherlock_features_numpy = np.append(sherlock_features_numpy,sherlock_features[-1],axis=0)
+
 print sherlock_features_numpy.shape
+
 np.save('sherlock_features.npy', sherlock_features_numpy)
-# print sherlock_features_numpy.shape
