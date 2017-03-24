@@ -98,4 +98,4 @@ plt.plot(training_loss)
 plt.title("Training loss for the network")
 plt.savefig('loss.png')
 
-model.save('trained_vqa_100epochs')
+model.save('trained_vqa_100epochs.hd5')
